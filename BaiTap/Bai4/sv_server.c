@@ -56,7 +56,11 @@ int main(int argc, char *argv[])
     {
 
         int str_len = recv(clnt_sock, buf, sizeof(buf), 0);
-        if (str_len <= 0 )
+        if (str_len < sizeof(buf))
+        {
+            buf[str_len] = 0;
+        }
+        if (str_len <= 0)
         {
             printf("Disconnect!\n");
             return 0;
@@ -68,9 +72,9 @@ int main(int argc, char *argv[])
         strftime(s, sizeof(s), "%Y-%m-%d %H:%M:%S", tm);
 
         char msg[1000];
-        sprintf(msg, "%s %s %s\n",inet_ntoa(client.sin_addr),s,buf );
-        fwrite(msg,1,strlen(msg),log_file);
-        printf("%s\n",msg);
+        sprintf(msg, "%s %s %s\n", inet_ntoa(client.sin_addr), s, buf);
+        fwrite(msg, 1, strlen(msg), log_file);
+        printf("%s\n", msg);
     }
 
     fclose(log_file);
