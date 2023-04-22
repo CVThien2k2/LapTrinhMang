@@ -5,17 +5,6 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-struct Maytinh
-{
-    char tenmaytinh[20];
-    int CountDisk;
-    struct Disk
-    {
-        char namedisk[10];
-        int kich_thuoc;
-    } disk[10];
-};
-
 int main()
 {
 
@@ -38,42 +27,40 @@ int main()
         return 0;
     }
     printf("Đã kết nối!!\n");
+    char computer[200];
+    char message[256];
     while (1)
     {
-        struct Maytinh maytinh;
-        printf("\n\n**Nhập thông tin máy tính, nếu muốn thoát ấn tổ hợp Ctrl + C**\n\n");
-
-        printf("+Nhập tên máy tính: ");
-        scanf("%s", maytinh.tenmaytinh);
-
-        printf("Nhập số ổ đĩa: ");
-        scanf(" %d", &maytinh.CountDisk);
-
-        for (int i = 0; i < maytinh.CountDisk; i++)
+        memset(message, 0, sizeof(message));
+        memset(computer, 0, sizeof(computer));
+        printf("Nhập vào tên của máy tính: ");
+        scanf("%s", computer);
+        int n;
+        printf("Nhập vào số ổ cứng: ");
+        scanf("%d", &n);
+        char num[10];
+        sprintf(num, "%d", n);
+        strncpy(message + strlen(message), num, sizeof(num));
+        strncpy(message + strlen(message), " ", 1);
+        strncpy(message + strlen(message), computer, sizeof(computer));
+        for (int i = 0; i < n; i++)
         {
-            printf("Nhập ký tự ổ đĩa thứ %d: ", i + 1);
-            scanf("%s", maytinh.disk[i].namedisk);
-            printf("Nhập kích thước ổ đĩa thứ %d: ", i + 1);
-            scanf("%d", &maytinh.disk[i].kich_thuoc);
+            char name[10];
+            char dungluong[10];
+
+            printf("Nhập vào tên ổ cứng %d: ", i + 1);
+            scanf("%s", name);
+
+            printf("Nhập vào dung lượng ổ cứng %s: ", name);
+            scanf("%s", dungluong);
+            strncpy(message + strlen(message), " ", 1);
+            strncpy(message + strlen(message), name, sizeof(name));
+            strncpy(message + strlen(message), " ", 1);
+            strncpy(message + strlen(message), dungluong, sizeof(dungluong));
         }
 
-        char message[256];
-        sprintf(message, "%s/%d", maytinh.tenmaytinh, maytinh.CountDisk);
-
-        int pos = strlen(message);
-        for (int i = 0; i < maytinh.CountDisk; i++)
-        {
-            int result = snprintf(message + pos, sizeof(message) - pos, "/%s/%d", maytinh.disk[i].namedisk, maytinh.disk[i].kich_thuoc);
-            if (result >= sizeof(message) - pos || result < 0)
-            {
-                // Xử lý lỗi
-                break;
-            }
-            pos += result;
-        }
-        printf("%s", message);
-
-        write(sock, message, strlen(message));
+        send(sock, message, strlen(message), 0);
+        printf("\n\n");
     }
 
     close(sock);
