@@ -9,8 +9,37 @@
 #include <sys/select.h>
 #include <stdbool.h>
 #include <ctype.h>
-void trim(char *s);
-void capitalize(char *s);
+void sanitize_input(char *str)
+{
+    int i, j;
+    bool prev_space = true;
+
+    for (i = 0, j = 0; str[i] != '\0'; i++)
+    {
+        if (str[i] == ' ')
+        {
+            if (!prev_space)
+            {
+                str[j++] = str[i];
+                prev_space = true;
+            }
+        }
+        else
+        {
+            if (prev_space)
+            {
+                str[j++] = toupper(str[i]);
+                prev_space = false;
+            }
+            else
+            {
+                str[j++] = tolower(str[i]);
+            }
+        }
+    }
+
+    str[j] = '\0';
+}
 int main()
 {
     int listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -96,29 +125,15 @@ int main()
                     // TODO: Client đã ngắt kết nối, xóa client ra khỏi mảng
                     continue;
                 }
-                buf[ret] = 0;
-                char *str = buf;
-                char *out = str, *end = str + strlen(str);
-                // Loại bỏ khoảng trắng đầu câu
-                while (isspace(*str))
-                {
-                    str++;
+                buf[ret] = '\0'; // Thêm '\0' vào cuối chuỗi để đảm bảo rằng chuỗi luôn kết thúc đúng cách
+                sanitize_input(buf);
+                if(strcmp(buf, "Exit") == 0){
+                     send(clients[i], "Tạm biệt", strlen("Tạm biệt"), 0);
                 }
-                // Xóa khoảng trắng cuối câu
-                while (isspace(*(--end)))
-                    ;
-                *(++end) = '\0';
-                // Dịch các từ và xóa khoảng trắng thừa giữa các từ
-                char prev_char = ' ';
-                while (*str)
-                {
-                    if (!isspace(*str) || (prev_char && !isspace(prev_char)))
-                    {
-                        *(out++) = *str;
-                    }
-                    prev_char = *str++;
+                else{
+                    send(clients[i], buf, strlen(buf), 0);
                 }
-                printf("%s", str);
+                
             }
         }
     }
