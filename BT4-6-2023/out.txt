@@ -1,0 +1,2 @@
+client	  database.txt	telnet_server	 text.txt
+client.c  out.txt	telnet_server.c
