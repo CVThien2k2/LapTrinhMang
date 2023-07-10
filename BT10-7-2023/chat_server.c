@@ -110,7 +110,7 @@ void *handle_client(void *arg)
                 {
                     if (current->numclient != client)
                     {
-                        send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
+                        send(client, buf, strlen(buf), 0);
                     }
                     current = current->next;
                 }
