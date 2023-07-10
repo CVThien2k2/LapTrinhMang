@@ -8,12 +8,13 @@
 #include <string.h>
 #include <sys/select.h>
 #include <pthread.h>
+#include <stdbool.h>
+#include <ctype.h>
 
-#define MAX_CLIENTS 64
+
 #define BUFFER_SIZE 256
 
-int clients[MAX_CLIENTS];
-char nameClients[MAX_CLIENTS][50];
+char Topic[50];
 int num_clients = 0;
 
 struct node
@@ -53,21 +54,40 @@ void createUser(const char *name, int numclient)
         user->next = NULL;
     }
 }
+bool checkName(char *name)
+{
+    for (int i = 0; i < strlen(name); i++)
+    {
+        if (!isalnum(name[i]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
 void *handle_client(void *arg)
 {
     int client = *(int *)arg;
     char buf[BUFFER_SIZE];
-
+    char nameclient[50];
     while (1)
     {
+
         memset(buf, 0, sizeof(buf));
         int rcv = recv(client, buf, sizeof(buf), 0);
         if (rcv <= 0)
         {
             break;
         }
-        char firstCluster[50];
-        char remainingString[50];
+        if (strcmp(buf, "QUIT\n") == 0)
+        {
+            send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
+            break;
+        }
+        char first[50];
+        memset(first, 0, sizeof(first));
+        char last[50];
+        memset(last, 0, sizeof(last));
 
         // Tìm vị trí khoảng trắng đầu tiên
         char *spacePosition = strchr(buf, ' ');
@@ -78,43 +98,179 @@ void *handle_client(void *arg)
             int firstClusterLength = spacePosition - buf;
 
             // Sao chép cụm đầu tiên vào biến firstCluster
-            strncpy(firstCluster, buf, firstClusterLength);
-            firstCluster[firstClusterLength] = '\0';
+            strncpy(first, buf, firstClusterLength);
+            first[firstClusterLength] = '\0';
 
             // Sao chép chuỗi còn lại vào biến remainingString
-            strcpy(remainingString, spacePosition + 1);
+            strcpy(last, spacePosition + 1);
+            last[strlen(last) - 1] = '\0';
         }
-        if (strcmp(firstCluster, "JOIN") == 0)
+        if (strcmp(first, "JOIN") == 0)
         {
+            if (checkName(last))
+            {
+                struct node *current = head;
+                int count = 0;
+                while (current != NULL)
+                {
+                    if (strcmp(current->name, last) == 0)
+                    {
+                        count++;
+                    }
+                    current = current->next;
+                }
+                if (count != 0)
+                {
+                    send(client, "200 NICKNAME IN USE\r\n", strlen("200 NICKNAME IN USE\r\n"), 0);
+                }
+                else
+                {
+                    createUser(last, client);
+                    send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
+                    strcpy(nameclient, last);
+                    struct node *current = head;
+                    while (current != NULL)
+                    {
+                        if (current->numclient != client)
+                        {
+                            send(current->numclient, buf, strlen(buf), 0);
+                        }
+                        current = current->next;
+                    }
+                }
+            }
+            else{
+                send(client, "201 INVALID NICK NAME\r\n", strlen("201 INVALID NICK NAME\r\n"), 0);
+            }
+        }
+        else if (strcmp(first, "MSG") == 0)
+        {
+
+            char full_msg[500];
+            int msg_len = snprintf(full_msg, sizeof(full_msg), "MSG %s %s\r\n", nameclient, last);
+            struct node *current = head;
+            current = head;
+            send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
+            while (current != NULL)
+            {
+                if (current->numclient != client)
+                {
+                    send(current->numclient, full_msg, strlen(full_msg), 0);
+                }
+                current = current->next;
+            }
+        }
+        else if (strcmp(first, "PMSG") == 0)
+        {
+            char name1[50];
+            char msg[50];
+
+            // Tìm vị trí khoảng trắng đầu tiên
+            char *spacePosition1 = strchr(last, ' ');
+
+            if (spacePosition1 != NULL)
+            {
+                // Tính toán độ dài của cụm đầu tiên
+                int names = spacePosition1 - last;
+
+                // Sao chép cụm đầu tiên vào biến firstCluster
+                strncpy(name1, last, names);
+                name1[names] = '\0';
+
+                // Sao chép chuỗi còn lại vào biến remainingString
+                strcpy(msg, spacePosition1 + 1);
+            }
             struct node *current = head;
             int count = 0;
             while (current != NULL)
             {
-                if (strcmp(current->name, remainingString) == 0)
+                if (strcmp(current->name, name1)==0)
                 {
+                    send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
+                    char full_msg[500];
+                    int msg_len = snprintf(full_msg, sizeof(full_msg), "PMSG %s %s\r\n", nameclient, msg);
+                    send(current->numclient, full_msg, strlen(full_msg), 0);
                     count++;
+                    break;
                 }
                 current = current->next;
             }
-            if (count != 0)
+            if (count == 0)
             {
-                send(client, "200 NICKNAME IN USE\r\n", strlen("200 NICKNAME IN USE\r\n"), 0);
+                send(client, "202 UNKNOWN NICKNAME\r\n", strlen("202 UNKNOWN NICKNAME\r\n"), 0);
+            }
+        }
+        else if (strcmp(first, "KICK") == 0)
+        {
+            if (key->numclient != client)
+            {
+                send(client, "203 DENIED\r\n", strlen("203 DENIED\r\n"), 0);
             }
             else
             {
-                createUser(remainingString, client);
-                send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
                 struct node *current = head;
-
+                int count = 0;
                 while (current != NULL)
                 {
-                    if (current->numclient != client)
+                    if (strcmp(current->name, last)==0)
                     {
-                        send(client, buf, strlen(buf), 0);
+                        send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
+                        current->prev->next = current->next;
+                        current->next->prev = current->prev;
+                        count++;
+                        close(current->numclient);
+                        break;
                     }
                     current = current->next;
                 }
+                if (count == 0)
+                {
+                    send(client, "202 UNKNOWN NICKNAME\r\n", strlen("202 UNKNOWN NICKNAME\r\n"), 0);
+                }
             }
+        }
+        else if (strcmp(first, "OP") == 0)
+        {
+            if (key->numclient != client)
+            {
+                send(client, "203 DENIED\r\n", strlen("203 DENIED\r\n"), 0);
+            }
+            else
+            {
+                struct node *current = head;
+                int count = 0;
+                while (current != NULL)
+                {
+                    if (strcmp(current->name, last))
+                    {
+                        key = current;
+                        send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
+                        count++;
+                        break;
+                    }
+                    current = current->next;
+                }
+                if (count == 0)
+                {
+                    send(client, "202 UNKNOWN NICKNAME\r\n", strlen("202 UNKNOWN NICKNAME\r\n"), 0);
+                }
+            }
+        }
+        else if (strcmp(first, "TOPIC") == 0)
+        {
+            if (key->numclient != client)
+            {
+                send(client, "203 DENIED\r\n", strlen("203 DENIED\r\n"), 0);
+            }
+            else
+            {
+                send(client, "100 OK\r\n", strlen("100 OK\r\n"), 0);
+                strcpy(Topic, last);
+            }
+        }
+        else
+        {
+            send(client, "999 UNKNOWN ERROR\r\n", strlen("999 UNKNOWN ERROR\r\n"), 0);
         }
     }
 
